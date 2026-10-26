@@ -3,8 +3,9 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator, RegexValidator 
-
+from django.utils import timezone 
 # Create your models here.
+
 def Email_validator(value):
     if not value:
         raise ValidationError("l'address email est obligatoire")
@@ -21,9 +22,21 @@ class Utilisateur(AbstractUser):
     ],default='chargeur')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    def save(self,*args,**kwargs):
+        if not self.user_id:
+            annee = timezone.now().strftime('%y')
+            prefix = f"{annee}user"
+            dernier = Utilisateur.objects.filter(user_id__startswith=prefix).order_by('-user_id').first()
+            compteur = int(dernier.user_id[-2:]) + 1 if dernier else 0
+            if compteur > 99:
+                raise ValidationError()
+            self.user_id = f"{prefix}{compteur:02d}"
+        super().save(*args,**kwargs)
     
 matrucile_fiscal_validator = RegexValidator(regex=r'\d[17][/ -]?[a-Za-z][/ -]?[ABDNPEabdnpe][/ -]?[MPCNEmpcne][/ -]?\d{3}$',
                                                 message="fromat non confirmee")
+
+    
 
 class Entreprise(models.Model):
     raison_sociale = models.CharField(max_length=200, null=False , blank=False)
@@ -36,4 +49,5 @@ class Entreprise(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # relation between entreprise and user models 
     gerant = models.OneToOneField(Utilisateur , on_delete= models.CASCADE,related_name='entreprise')
